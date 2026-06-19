@@ -65,6 +65,21 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
 
+  // SSO token handoff from the ImmersiveKit dashboard.
+  useEffect(() => {
+    if (!dataAdapter.loginWithToken) return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (!token) return;
+
+    async function redeemToken() {
+      const status = await dataAdapter.loginWithToken!(token!);
+      window.history.replaceState({}, '', window.location.pathname);
+      setAuthUser(status.user);
+    }
+    void redeemToken();
+  }, []);
+
   const currentUser = linkAuthUserToStaff(authUser, state.staffMembers);
   const isProductionUnauthenticated = !dataAdapter.isDemo && !currentUser?.isAuthenticated;
   const canManage = canManageData(currentUser);

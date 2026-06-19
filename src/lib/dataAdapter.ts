@@ -54,6 +54,7 @@ export interface PersistenceAdapter {
   saveAuditMetadata(metadata: AuditMetadata): Promise<void>;
   getAuthStatus(): AuthStatus;
   login?(credentials: LoginCredentials): Promise<AuthStatus>;
+  loginWithToken?(token: string): Promise<AuthStatus>;
   logout?(): Promise<void>;
 }
 
@@ -571,6 +572,15 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
       await withPocketBaseErrors('users', 'login', async () => {
         await pb.collection('users').authWithPassword(credentials.email, credentials.password);
       });
+      return getPocketBaseAuthStatus(pb);
+    },
+    async loginWithToken(token) {
+      pb.authStore.save(token, null);
+      try {
+        await pb.collection('users').authRefresh();
+      } catch {
+        pb.authStore.clear();
+      }
       return getPocketBaseAuthStatus(pb);
     },
     async logout() {
