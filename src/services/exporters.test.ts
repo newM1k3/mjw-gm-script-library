@@ -144,13 +144,13 @@ function exportReadyState(): AppState {
 function expectEnvelopeShape(payload: Record<string, unknown>, exportType: string): void {
   expect(payload.gms_export_schema_version).toBe(GMS_EXPORT_SCHEMA_VERSION);
   expect(payload.version).toBe(GMS_EXPORT_SCHEMA_VERSION);
-  expect(payload.sourceApp).toBe('GM Script Library');
+  expect(payload.sourceApp).toBe('Scripts');
   expect(payload.exportType).toBe(exportType);
   expect(payload.exportedAt).toEqual(expect.any(String));
   expect(payload.generatedFrom).toBe('client_state');
   expect(payload.producer).toEqual(
     expect.objectContaining({
-      app: 'GM Script Library',
+      app: 'Scripts',
       platform: 'MJW Personal App Platform',
       schemaDocumentation: 'docs/export-schema.md',
     })
@@ -188,7 +188,7 @@ describe('room exports', () => {
   it('builds a Markdown packet with the room, current scripts, operational references, audit output, and schema version', () => {
     const markdown = exportRoomMarkdown(exportReadyState(), 'room-1');
 
-    expect(markdown).toContain('# GM Script Library — Room Script Packet');
+    expect(markdown).toContain('# Scripts — Room Script Packet');
     expect(markdown).toContain(`**Schema Version:** ${GMS_EXPORT_SCHEMA_VERSION}`);
     expect(markdown).toContain('**Room:** Clockwork Vault');
     expect(markdown).toContain('## Script Readiness Score: 100/100');
@@ -221,7 +221,7 @@ describe('schema-versioned export contracts', () => {
     expect(exports[0][1].payload.summary.totalRows).toBe(2);
     expect(exports[1][1].payload.metadata).toEqual(expect.objectContaining({ roomCount: 1, issueCount: 0 }));
     expect(exports[2][1].payload.state.rooms).toHaveLength(1);
-    expect(exports[3][1].payload.downstreamConsumers).toEqual(expect.arrayContaining(['RoomReady Ops', 'MJW Operator Toolkit']));
+    expect(exports[3][1].payload.downstreamConsumers).toEqual(expect.arrayContaining(['Ready', 'MJW Operator Toolkit']));
   });
 });
 

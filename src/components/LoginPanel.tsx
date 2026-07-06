@@ -24,7 +24,7 @@ export default function LoginPanel({ appLabel, error, isSubmitting, onLogin }: P
           <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto mb-3">
             <Lock className="w-6 h-6 text-slate-400" />
           </div>
-          <h1 className="text-xl font-bold text-slate-100">Sign in to GM Script Library</h1>
+          <h1 className="text-xl font-bold text-slate-100">Sign in to Scripts</h1>
           <p className="text-sm text-slate-500 mt-2">
             Production mode uses {appLabel} authentication. Anonymous users cannot manage operational script data.
           </p>

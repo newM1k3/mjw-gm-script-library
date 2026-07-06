@@ -1,5 +1,5 @@
 const GMS_EXPORT_SCHEMA_VERSION = '1.0.0';
-const GMS_SOURCE_APP = 'GM Script Library';
+const GMS_SOURCE_APP = 'Scripts';
 
 const collections = {
   rooms: 'gms_rooms',

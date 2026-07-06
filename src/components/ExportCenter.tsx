@@ -214,7 +214,7 @@ export default function ExportCenter({ state, isDemoMode, onRestoreDemoData, onA
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-100">Export Center</h1>
-          <p className="text-slate-400 text-sm mt-0.5">Production-ready import/export contracts for GM Script Library data and MJW ecosystem integrations.</p>
+          <p className="text-slate-400 text-sm mt-0.5">Production-ready import/export contracts for Scripts data and ImmersiveKit ecosystem integrations.</p>
           <p className="text-xs text-slate-500 mt-1">Schema version <code className="text-slate-300">{GMS_EXPORT_SCHEMA_VERSION}</code> · documented in <code className="text-slate-300">docs/export-schema.md</code></p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -357,9 +357,9 @@ export default function ExportCenter({ state, isDemoMode, onRestoreDemoData, onA
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Integration Destinations</h3>
             <div className="space-y-3">
               {[
-                { name: 'RoomReady Ops', use: 'Convert current-script acknowledgements into pre-shift readiness tasks.' },
-                { name: 'Puzzle Flow Visualizer', use: 'Associate hint ladders with puzzle flow stages and scaffold hint entries.' },
-                { name: 'Puzzle Dependency Auditor', use: 'Use readiness and hint coverage to flag progression risk.' },
+                { name: 'Ready', use: 'Convert current-script acknowledgements into pre-shift readiness tasks.' },
+                { name: 'Flow', use: 'Associate hint ladders with puzzle flow stages and scaffold hint entries.' },
+                { name: 'Logic', use: 'Use readiness and hint coverage to flag progression risk.' },
                 { name: 'MJW Operator Toolkit', use: 'Bundle operational exports for unified shift readiness.' },
               ].map((dest) => (
                 <div key={dest.name} className="bg-slate-800/60 border border-slate-700/40 rounded-lg p-3">

@@ -449,7 +449,7 @@ export default function App() {
         <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center px-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 max-w-md text-center shadow-xl">
             <Clock className="w-8 h-8 text-slate-500 mx-auto mb-3 animate-pulse" />
-            <h1 className="text-lg font-semibold text-slate-100">Loading GM Script Library</h1>
+            <h1 className="text-lg font-semibold text-slate-100">Loading Scripts</h1>
             <p className="text-sm text-slate-500 mt-2">Connecting to {dataAdapter.label} persistence.</p>
           </div>
         </div>
@@ -479,7 +479,7 @@ export default function App() {
         {isGMMode ? (
           <div>
             <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-              <span className="text-xs text-slate-500">GM Script Library</span>
+              <span className="text-xs text-slate-500">Scripts</span>
               <button
                 onClick={() => navigate('dashboard')}
                 aria-label="Exit GM Mode"
@@ -539,7 +539,7 @@ export default function App() {
                     Demo Mode
                   </div>
                 )}
-                <div>MJW Platform · v{APP_VERSION}</div>
+                <div>ImmersiveKit · v{APP_VERSION}</div>
               </div>
             </aside>
 
@@ -560,7 +560,7 @@ export default function App() {
                   <Menu className="w-5 h-5" />
                 </button>
                 <h1 className="text-sm font-semibold text-slate-300 capitalize">
-                  {navItems.find((n) => n.id === screen)?.label ?? 'GM Script Library'}
+                  {navItems.find((n) => n.id === screen)?.label ?? 'Scripts'}
                 </h1>
                 <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
                   <label className="hidden lg:flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800 px-2 py-1 text-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/30">

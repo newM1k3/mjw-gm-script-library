@@ -42,7 +42,7 @@ export default function Dashboard({ state, onNavigate }: Props) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-slate-100 tracking-tight">GM Script Library</h1>
+        <h1 className="text-3xl font-bold text-slate-100 tracking-tight">Scripts</h1>
         <p className="mt-1 text-slate-400 text-sm">Script consistency and delivery control for escape-room operators</p>
       </div>
 
@@ -196,8 +196,8 @@ export default function Dashboard({ state, onNavigate }: Props) {
       <div className="bg-slate-800/30 border border-slate-700/40 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Future Integration Placeholders</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-500">
-          <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">RoomReady Ops:</span> Convert script acknowledgements into pre-shift readiness tasks.</span></div>
-          <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">Puzzle Flow Visualizer:</span> Import flow stages to scaffold hint ladder entries.</span></div>
+          <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">Ready:</span> Convert script acknowledgements into pre-shift readiness tasks.</span></div>
+          <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">Flow:</span> Import flow stages to scaffold hint ladder entries.</span></div>
           <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">PocketBase:</span> Production persistence via <code className="text-slate-400">VITE_POCKETBASE_URL</code>.</span></div>
           <div className="flex items-start gap-2"><span className="text-blue-500 mt-0.5">→</span><span><span className="text-slate-400 font-medium">AI Script Rewriting:</span> Netlify function for tone rewriting without altering safety blocks.</span></div>
         </div>
