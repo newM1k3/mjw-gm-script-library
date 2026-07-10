@@ -1,3 +1,5 @@
+import type { AIRewriteSettings } from './lib/aiRewrite';
+
 export type RoomStatus = 'active' | 'inactive' | 'maintenance' | 'retired';
 export type RoomDifficulty = 'easy' | 'medium' | 'hard' | 'expert';
 
@@ -159,7 +161,7 @@ export interface AIRewriteMetadata {
   model: string;
   generatedAt: string;
   sourceVersionId: string | null;
-  settings: Record<string, string>;
+  settings: AIRewriteSettings;
   requiredBlockCheck: {
     preserved: boolean;
     missingBlocks: string[];

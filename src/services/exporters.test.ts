@@ -266,7 +266,8 @@ describe('room packet import validation and safe restore', () => {
     const nextState = applyRoomPacketImport(currentState, preview.packet!, 'merge');
     expect(nextState.rooms.map((room) => room.name)).toEqual(expect.arrayContaining(['Clockwork Vault', 'Mirror Library']));
     expect(nextState.scripts).toHaveLength(4);
-    expect(nextState.auditEvents.at(-1)).toEqual(expect.objectContaining({ action: 'import', entityType: 'room_packet', roomId: 'room-2' }));
+    const importEvents = nextState.auditEvents ?? [];
+    expect(importEvents[importEvents.length - 1]).toEqual(expect.objectContaining({ action: 'import', entityType: 'room_packet', roomId: 'room-2' }));
   });
 
   it('overwrites only the imported room packet scope and preserves unrelated rooms', () => {
@@ -295,6 +296,7 @@ describe('room packet import validation and safe restore', () => {
     expect(nextState.rooms.map((room) => room.id)).toEqual(expect.arrayContaining(['room-1', 'room-other']));
     expect(nextState.scripts.some((script) => script.id === 'orphaned-old-room-script')).toBe(false);
     expect(nextState.scripts.filter((script) => script.roomId === 'room-1')).toHaveLength(2);
-    expect(nextState.auditEvents.at(-1)?.summary).toContain('Overwrote room packet import');
+    const overwriteEvents = nextState.auditEvents ?? [];
+    expect(overwriteEvents[overwriteEvents.length - 1]?.summary).toContain('Overwrote room packet import');
   });
 });

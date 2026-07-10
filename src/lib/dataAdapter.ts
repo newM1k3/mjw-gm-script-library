@@ -2,6 +2,7 @@ import PocketBase from 'pocketbase';
 
 import {
   Acknowledgement,
+  AIRewriteMetadata,
   AppState,
   AuditEvent,
   AuditEventAction,
@@ -285,6 +286,21 @@ function recordTimestamp(record: PocketBaseRecord, field: 'createdAt' | 'updated
   return asString(record[field], asString(record[fallbackField], new Date().toISOString()));
 }
 
+function optionalAIRewrite(value: unknown): AIRewriteMetadata | undefined {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    if (parsed.trim().length === 0) return undefined;
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return undefined;
+    }
+  }
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? (parsed as AIRewriteMetadata)
+    : undefined;
+}
+
 function optionalField(record: PocketBaseRecord, field: string): string | undefined {
   const value = asString(record[field]);
   return value.length > 0 ? value : undefined;
@@ -408,7 +424,7 @@ export function mapPocketBaseScriptVersion(record: PocketBaseRecord): ScriptVers
     rejectedAt: optionalNullableField(record, 'rejectedAt'),
     safetyBlockChecksum: optionalField(record, 'safetyBlockChecksum'),
     previousVersionId: optionalNullableField(record, 'previousVersionId'),
-    aiRewrite: optionalField(record, 'aiRewrite'),
+    aiRewrite: optionalAIRewrite(record.aiRewrite),
   };
 }
 
