@@ -134,6 +134,7 @@ export function buildAIRewriteDraftPreview(
 
   return {
     ...response,
+    bodyMarkdown: response.rewrittenBodyMarkdown,
     requiredBlockCheck,
     diff: buildVersionDiff(sourceVersion, candidateVersion),
   };
