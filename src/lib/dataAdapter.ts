@@ -282,6 +282,14 @@ function recordAppId(record: PocketBaseRecord): string {
   return asString(record.appId, record.id);
 }
 
+function recordOrganizationId(record: PocketBaseRecord): string | undefined {
+  return optionalField(record, 'organization') ?? optionalField(record, 'organizationId');
+}
+
+function recordVenueId(record: PocketBaseRecord): string | undefined {
+  return optionalField(record, 'venue');
+}
+
 function recordTimestamp(record: PocketBaseRecord, field: 'createdAt' | 'updatedAt', fallbackField: 'created' | 'updated'): string {
   return asString(record[field], asString(record[fallbackField], new Date().toISOString()));
 }
@@ -375,7 +383,8 @@ function getPocketBaseAuthStatus(pb: PocketBase): AuthStatus {
 export function mapPocketBaseRoom(record: PocketBaseRecord): Room {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     name: asString(record.name),
     theme: asString(record.theme),
     durationMinutes: asNumber(record.durationMinutes),
@@ -390,7 +399,8 @@ export function mapPocketBaseRoom(record: PocketBaseRecord): Room {
 export function mapPocketBaseScript(record: PocketBaseRecord): Script {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     roomId: asString(record.roomId),
     title: asString(record.title),
     scriptType: asString(record.scriptType, 'training_note') as Script['scriptType'],
@@ -406,7 +416,8 @@ export function mapPocketBaseScript(record: PocketBaseRecord): Script {
 export function mapPocketBaseScriptVersion(record: PocketBaseRecord): ScriptVersion {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     scriptId: asString(record.scriptId),
     versionNumber: asString(record.versionNumber),
     bodyMarkdown: asString(record.bodyMarkdown),
@@ -431,7 +442,8 @@ export function mapPocketBaseScriptVersion(record: PocketBaseRecord): ScriptVers
 export function mapPocketBaseHintLadder(record: PocketBaseRecord): HintLadder {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     roomId: asString(record.roomId),
     puzzleLabel: asString(record.puzzleLabel),
     stageLabel: asString(record.stageLabel),
@@ -446,7 +458,8 @@ export function mapPocketBaseHintLadder(record: PocketBaseRecord): HintLadder {
 export function mapPocketBasePronunciationTerm(record: PocketBaseRecord): PronunciationTerm {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     roomId: asString(record.roomId),
     term: asString(record.term),
     phonetic: asString(record.phonetic),
@@ -462,7 +475,8 @@ export function mapPocketBasePronunciationTerm(record: PocketBaseRecord): Pronun
 export function mapPocketBaseStaffMember(record: PocketBaseRecord): StaffMember {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     name: asString(record.name),
     email: optionalField(record, 'email'),
     authUserId: optionalNullableField(record, 'authUserId'),
@@ -478,7 +492,8 @@ export function mapPocketBaseStaffMember(record: PocketBaseRecord): StaffMember 
 export function mapPocketBaseAcknowledgement(record: PocketBaseRecord): Acknowledgement {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     staffId: asString(record.staffId),
     scriptId: asString(record.scriptId),
     versionId: asString(record.versionId),
@@ -497,7 +512,8 @@ export function mapPocketBaseAcknowledgement(record: PocketBaseRecord): Acknowle
 export function mapPocketBaseAuditEvent(record: PocketBaseRecord): AuditEvent {
   return {
     id: recordAppId(record),
-    organizationId: optionalField(record, 'organizationId'),
+    organizationId: recordOrganizationId(record),
+    venueId: recordVenueId(record),
     action: asString(record.action, 'update') as AuditEventAction,
     entityType: asString(record.entityType, 'app_state') as AuditEventEntityType,
     entityId: asString(record.entityId),
@@ -515,21 +531,72 @@ export function mapPocketBaseAuditEvent(record: PocketBaseRecord): AuditEvent {
   };
 }
 
-function toPocketBaseRecord(entity: AppEntity): Record<string, unknown> {
+function toPocketBaseRecord(entity: AppEntity, scope?: VenueScope): Record<string, unknown> {
   const fields: Record<string, unknown> = { ...entity, appId: entity.id };
   delete fields.id;
 
+  if (scope) {
+    // Stamp the tenant scope so the collection access rules and venue filters resolve.
+    fields.organization = scope.organizationId;
+    fields.venue = scope.venueId;
+    fields.organizationId = scope.organizationId; // keep the legacy text field in sync
+  }
+
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
+}
+
+/** The signed-in user's tenant scope: their organization and the venue every row is filtered to. */
+export interface VenueScope {
+  organizationId: string;
+  venueId: string;
+}
+
+/** A PocketBase-quoted filter for the venue every read/list/delete in this adapter is bounded by. */
+function venueFilter(scope: VenueScope): string {
+  return `venue = "${scope.venueId}"`;
+}
+
+/**
+ * Resolve the signed-in user's tenant scope from their membership, mirroring
+ * `mjw-lock-mapping-studio/src/lib/lockmap.ts` → resolveRoomContext: first active
+ * membership → its organization → that org's first `projects` record (the venue).
+ * Returns null when there is no valid auth or no membership/venue, so callers can
+ * fall back to the local/demo path instead of running unscoped PocketBase queries.
+ */
+async function resolveVenueScope(pb: PocketBase): Promise<VenueScope | null> {
+  if (!pb.authStore.isValid) return null;
+  const uid = pb.authStore.record?.id;
+  if (!uid) return null;
+
+  const memberships = await pb.collection('memberships').getFullList({
+    filter: `user = '${uid}' && status = 'active'`,
+    requestKey: null,
+  });
+  for (const membership of memberships) {
+    const organizationId = membership.organization as string;
+    if (!organizationId) continue;
+    const projects = await pb.collection('projects').getFullList({
+      filter: `organization = '${organizationId}'`,
+      requestKey: null,
+    });
+    const venue = projects[0];
+    if (!venue) continue;
+    return { organizationId, venueId: venue.id };
+  }
+  return null;
 }
 
 async function loadCollection<T>(
   pb: PocketBase,
   collectionName: string,
   mapper: (record: PocketBaseRecord) => T,
+  scope: VenueScope,
   sort = 'created'
 ): Promise<T[]> {
   return withPocketBaseErrors(collectionName, 'load', async () => {
-    const records = await pb.collection(collectionName).getFullList<PocketBaseRecord>({ sort });
+    const records = await pb
+      .collection(collectionName)
+      .getFullList<PocketBaseRecord>({ sort, filter: venueFilter(scope), requestKey: null });
     return records.map(mapper);
   });
 }
@@ -537,17 +604,22 @@ async function loadCollection<T>(
 async function saveCollection<T extends AppEntity>(
   pb: PocketBase,
   collectionName: string,
-  entities: T[]
+  entities: T[],
+  scope: VenueScope
 ): Promise<void> {
   await withPocketBaseErrors(collectionName, 'save', async () => {
     const collection = pb.collection(collectionName);
-    const existingRecords = await collection.getFullList<PocketBaseRecord>();
+    // Only this venue's rows — so the delete-reconciliation below can never reach another tenant's records.
+    const existingRecords = await collection.getFullList<PocketBaseRecord>({
+      filter: venueFilter(scope),
+      requestKey: null,
+    });
     const existingByAppId = new Map(existingRecords.map((record) => [recordAppId(record), record]));
     const nextIds = new Set(entities.map((entity) => entity.id));
 
     await Promise.all(
       entities.map((entity) => {
-        const payload = toPocketBaseRecord(entity);
+        const payload = toPocketBaseRecord(entity, scope);
         const existingRecord = existingByAppId.get(entity.id);
         return existingRecord ? collection.update(existingRecord.id, payload) : collection.create(payload);
       })
@@ -577,6 +649,24 @@ function auditMetadataToEvent(metadata: AuditMetadata): AuditEvent {
 function createPocketBaseAdapter(url: string): PersistenceAdapter {
   const pb = new PocketBase(url);
 
+  // The signed-in user's venue scope, resolved lazily after auth and cached.
+  // Null means "no resolvable venue" (anonymous, no membership, or resolution
+  // failed) → callers fall back to the local/demo path instead of running any
+  // unscoped PocketBase query.
+  let scopePromise: Promise<VenueScope | null> | null = null;
+
+  function loadScope(forceRefresh = false): Promise<VenueScope | null> {
+    if (forceRefresh) scopePromise = null;
+    if (!pb.authStore.isValid) {
+      scopePromise = null;
+      return Promise.resolve(null);
+    }
+    if (!scopePromise) {
+      scopePromise = resolveVenueScope(pb).catch(() => null);
+    }
+    return scopePromise;
+  }
+
   return {
     mode: 'pocketbase',
     label: 'PocketBase',
@@ -588,6 +678,7 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
       await withPocketBaseErrors('users', 'login', async () => {
         await pb.collection('users').authWithPassword(credentials.email, credentials.password);
       });
+      await loadScope(true);
       return getPocketBaseAuthStatus(pb);
     },
     async loginWithToken(token) {
@@ -597,10 +688,12 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
       } catch {
         pb.authStore.clear();
       }
+      await loadScope(true);
       return getPocketBaseAuthStatus(pb);
     },
     async logout() {
       pb.authStore.clear();
+      scopePromise = null;
     },
     async loadAppState() {
       const [
@@ -645,52 +738,82 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
       if (state.auditEvents) await this.saveAuditEvents(state.auditEvents);
     },
     async loadRooms() {
-      return loadCollection(pb, collections.rooms, mapPocketBaseRoom);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadRooms();
+      return loadCollection(pb, collections.rooms, mapPocketBaseRoom, scope);
     },
     async saveRooms(rooms) {
-      await saveCollection(pb, collections.rooms, rooms);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveRooms(rooms);
+      await saveCollection(pb, collections.rooms, rooms, scope);
     },
     async loadScripts() {
-      return loadCollection(pb, collections.scripts, mapPocketBaseScript);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadScripts();
+      return loadCollection(pb, collections.scripts, mapPocketBaseScript, scope);
     },
     async saveScripts(scripts) {
-      await saveCollection(pb, collections.scripts, scripts);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveScripts(scripts);
+      await saveCollection(pb, collections.scripts, scripts, scope);
     },
     async loadScriptVersions() {
-      return loadCollection(pb, collections.scriptVersions, mapPocketBaseScriptVersion);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadScriptVersions();
+      return loadCollection(pb, collections.scriptVersions, mapPocketBaseScriptVersion, scope);
     },
     async saveScriptVersions(scriptVersions) {
-      await saveCollection(pb, collections.scriptVersions, scriptVersions);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveScriptVersions(scriptVersions);
+      await saveCollection(pb, collections.scriptVersions, scriptVersions, scope);
     },
     async loadHintLadders() {
-      return loadCollection(pb, collections.hintLadders, mapPocketBaseHintLadder);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadHintLadders();
+      return loadCollection(pb, collections.hintLadders, mapPocketBaseHintLadder, scope);
     },
     async saveHintLadders(hintLadders) {
-      await saveCollection(pb, collections.hintLadders, hintLadders);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveHintLadders(hintLadders);
+      await saveCollection(pb, collections.hintLadders, hintLadders, scope);
     },
     async loadPronunciationTerms() {
-      return loadCollection(pb, collections.pronunciationTerms, mapPocketBasePronunciationTerm);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadPronunciationTerms();
+      return loadCollection(pb, collections.pronunciationTerms, mapPocketBasePronunciationTerm, scope);
     },
     async savePronunciationTerms(pronunciationTerms) {
-      await saveCollection(pb, collections.pronunciationTerms, pronunciationTerms);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.savePronunciationTerms(pronunciationTerms);
+      await saveCollection(pb, collections.pronunciationTerms, pronunciationTerms, scope);
     },
     async loadStaffMembers() {
-      return loadCollection(pb, collections.staffMembers, mapPocketBaseStaffMember);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadStaffMembers();
+      return loadCollection(pb, collections.staffMembers, mapPocketBaseStaffMember, scope);
     },
     async saveStaffMembers(staffMembers) {
-      await saveCollection(pb, collections.staffMembers, staffMembers);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveStaffMembers(staffMembers);
+      await saveCollection(pb, collections.staffMembers, staffMembers, scope);
     },
     async loadAcknowledgements() {
-      return loadCollection(pb, collections.acknowledgements, mapPocketBaseAcknowledgement);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadAcknowledgements();
+      return loadCollection(pb, collections.acknowledgements, mapPocketBaseAcknowledgement, scope);
     },
     async saveAcknowledgements(acknowledgements) {
-      await saveCollection(pb, collections.acknowledgements, acknowledgements);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveAcknowledgements(acknowledgements);
+      await saveCollection(pb, collections.acknowledgements, acknowledgements, scope);
     },
     async createAcknowledgement(acknowledgement, auditEvent) {
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.createAcknowledgement!(acknowledgement, auditEvent);
       return withPocketBaseErrors(collections.acknowledgements, 'create acknowledgement', async () => {
         const createdAcknowledgement = await pb
           .collection(collections.acknowledgements)
-          .create<PocketBaseRecord>(toPocketBaseRecord(acknowledgement));
+          .create<PocketBaseRecord>(toPocketBaseRecord(acknowledgement, scope));
         const serverAcknowledgedAt = createdAcknowledgement.created ?? acknowledgement.acknowledgedAt;
         const timestampedAcknowledgement = await pb
           .collection(collections.acknowledgements)
@@ -698,7 +821,7 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
 
         const createdAuditEvent = await pb
           .collection(collections.auditEvents)
-          .create<PocketBaseRecord>(toPocketBaseRecord({ ...auditEvent, createdAt: serverAcknowledgedAt }));
+          .create<PocketBaseRecord>(toPocketBaseRecord({ ...auditEvent, createdAt: serverAcknowledgedAt }, scope));
         const serverAuditCreatedAt = createdAuditEvent.created ?? serverAcknowledgedAt;
         const timestampedAuditEvent = await pb
           .collection(collections.auditEvents)
@@ -711,14 +834,20 @@ function createPocketBaseAdapter(url: string): PersistenceAdapter {
       });
     },
     async loadAuditEvents() {
-      return loadCollection(pb, collections.auditEvents, mapPocketBaseAuditEvent, '-created');
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.loadAuditEvents();
+      return loadCollection(pb, collections.auditEvents, mapPocketBaseAuditEvent, scope, '-created');
     },
     async saveAuditEvents(auditEvents) {
-      await saveCollection(pb, collections.auditEvents, auditEvents);
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.saveAuditEvents(auditEvents);
+      await saveCollection(pb, collections.auditEvents, auditEvents, scope);
     },
     async recordAuditEvent(event) {
+      const scope = await loadScope();
+      if (!scope) return localStorageAdapter.recordAuditEvent(event);
       await withPocketBaseErrors(collections.auditEvents, 'create audit event', async () => {
-        await pb.collection(collections.auditEvents).create(toPocketBaseRecord(event));
+        await pb.collection(collections.auditEvents).create(toPocketBaseRecord(event, scope));
       });
     },
     async loadAuditMetadata() {
