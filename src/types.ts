@@ -126,8 +126,10 @@ export type AuditEventEntityType =
   | 'app_state';
 
 export interface ProductionScopedRecord {
-  /** Reserved for future multi-organization support. The current app remains single-organization. */
+  /** Organization that owns the record, resolved from the signed-in user's membership. */
   organizationId?: string;
+  /** Venue (platform `projects` record) the record is scoped to — the per-tenant boundary. */
+  venueId?: string;
 }
 
 export interface Room extends ProductionScopedRecord {
