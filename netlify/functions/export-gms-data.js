@@ -1,6 +1,55 @@
 const GMS_EXPORT_SCHEMA_VERSION = '1.0.0';
 const GMS_SOURCE_APP = 'Scripts';
 
+/**
+ * PocketBase issues superuser tokens with a 24-hour lifetime, so a static PB_SUPERUSER_TOKEN
+ * env var is dead within a day — this export returned 503 in production because of it.
+ * Authenticate with PB_SUPERUSER_EMAIL / PB_SUPERUSER_PASSWORD instead, caching per container
+ * (Netlify reuses warm ones) and refreshing a minute before the JWT's own exp.
+ *
+ * Inlined rather than shared: this package is "type": "module" and this file is the only CJS
+ * consumer, so a separate module would need its own format decision for no benefit.
+ * Reference implementation: mjw-AI-escape-room-generator/netlify/functions/pbSuperuser.ts.
+ */
+let cachedSuperuser = null; // { token, expiresAt }
+
+function tokenExpiryMs(token) {
+  try {
+    const [, payload] = token.split('.');
+    const decoded = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    return Number.isFinite(decoded.exp) ? decoded.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function getSuperuserToken(baseUrl) {
+  if (cachedSuperuser && Date.now() < cachedSuperuser.expiresAt) return cachedSuperuser.token;
+
+  const email = (process.env.PB_SUPERUSER_EMAIL || '').trim();
+  const password = (process.env.PB_SUPERUSER_PASSWORD || '').trim();
+  if (!email || !password) {
+    throw new Error('PocketBase superuser auth is not configured (set PB_SUPERUSER_EMAIL + PB_SUPERUSER_PASSWORD).');
+  }
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/collections/_superusers/auth-with-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity: email, password }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`PocketBase superuser auth failed (HTTP ${response.status}). ${detail.slice(0, 200)}`);
+  }
+
+  const body = await response.json();
+  if (!body.token) throw new Error('PocketBase superuser auth returned no token.');
+
+  const expiresAt = tokenExpiryMs(body.token);
+  cachedSuperuser = { token: body.token, expiresAt: expiresAt ? expiresAt - 60_000 : Date.now() + 5 * 60_000 };
+  return cachedSuperuser.token;
+}
+
 const collections = {
   rooms: 'gms_rooms',
   scripts: 'gms_scripts',
@@ -55,7 +104,11 @@ function normalizeRecord(record) {
 async function fetchCollection(baseUrl, token, collectionName) {
   const url = new URL(`/api/collections/${collectionName}/records`, baseUrl);
   url.searchParams.set('perPage', '500');
-  url.searchParams.set('sort', 'created');
+  // Sort by id, not `created`: the gms_* collections predate the autodate convention and have
+  // no `created` field, so PocketBase 400s the whole export. `createdAt` is not usable either
+  // — gms_staff_members and gms_acknowledgements lack it. id is the only field present on all
+  // eight, and keeps backups diffable.
+  url.searchParams.set('sort', 'id');
 
   const response = await fetch(url, {
     headers: {
@@ -92,17 +145,17 @@ exports.handler = async (event) => {
   }
 
   const baseUrl = process.env.PB_SERVICE_URL || process.env.VITE_POCKETBASE_URL;
-  const serviceToken = process.env.PB_SUPERUSER_TOKEN;
 
-  if (!baseUrl || !serviceToken) {
+  if (!baseUrl || !process.env.PB_SUPERUSER_EMAIL || !process.env.PB_SUPERUSER_PASSWORD) {
     return jsonResponse(503, {
       error: 'Server-side export is not configured.',
-      requiredEnvironmentVariables: ['PB_SERVICE_URL', 'PB_SUPERUSER_TOKEN'],
+      requiredEnvironmentVariables: ['PB_SERVICE_URL', 'PB_SUPERUSER_EMAIL', 'PB_SUPERUSER_PASSWORD'],
       message: 'Configure PocketBase service credentials in Netlify to generate exports from backend data instead of client state.',
     });
   }
 
   try {
+    const serviceToken = await getSuperuserToken(baseUrl);
     const state = await loadBackendState(baseUrl, serviceToken);
     const payload = {
       state,
